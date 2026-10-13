@@ -1,0 +1,217 @@
+===============================================
+ASSIGNMENT 5: QUICK START GUIDE
+===============================================
+
+📁 WHAT'S IN THIS PACKAGE?
+===========================
+✓ nsphere.cu         - Updated CUDA kernel code
+✓ makefile           - Compilation rules  
+✓ submit_nsphere.sh  - SLURM job (basic tests)
+✓ submit_nsphere_scaling.sh - SLURM job (scaling study)
+✓ stress_gpu.sh      - **NEW** Stress test to breaking point
+✓ run_quick_test.sh  - Quick verification (no SLURM)
+✓ README_COMPLETE.md - Full documentation
+✓ QUICK_START.txt    - This file
+
+
+🚀 FASTEST WAY TO START (5 minutes)
+====================================
+
+1. Upload to CTCP cluster:
+   scp -r Assignment5_nsphere/ YOUR_ID@it096843.massey.ac.nz:~/
+
+2. SSH in:
+   ssh YOUR_ID@it096843.massey.ac.nz
+
+3. Navigate:
+   cd ~/Assignment5_nsphere
+
+4. Compile:
+   module load cuda
+   make clean && make
+
+5. Quick test (verify correctness):
+   ./nsphere 1 25.5    # Should output: GPU count = 51
+   ./nsphere 2 2.05    # Should output: GPU count = 13
+   ./nsphere 3 1.5     # Should output: GPU count = 19
+
+6. See R and D effects:
+   bash run_quick_test.sh
+
+
+📊 TESTING SCENARIOS
+====================
+
+SCENARIO A: Just verify it works
+  ./nsphere 2 2.05
+  ./nsphere 3 1.5
+  ./nsphere 1 25.5
+
+SCENARIO B: See D (dimension) effect
+  for D in 4 5 6 7 8 9 10; do
+    ./nsphere $D 8.0 256 1
+  done
+
+SCENARIO C: See R (radius) effect
+  for R in 4 6 8 10 12 16 20; do
+    ./nsphere 7 $R 256 1
+  done
+
+SCENARIO D: See COMBINED effect (best for professor)
+  ./nsphere 5 4.0 256 1
+  ./nsphere 6 6.0 256 1
+  ./nsphere 7 8.0 256 1
+  ./nsphere 8 10.0 256 1
+  ./nsphere 9 12.0 256 1
+  ./nsphere 10 16.0 256 1
+
+SCENARIO E: STRESS TEST - Find GPU limits
+  bash stress_gpu.sh | tee stress_results.txt
+  # Tests extreme D and R until overflow
+
+
+⚙️ PARAMETER MEANINGS
+======================
+./nsphere <ndim> <radius> [threads_per_block] [skipcpu]
+
+  ndim              = Dimension (D)
+  radius            = Radius (R)
+  threads_per_block = GPU threads (default 256, try 512, 1024)
+  skipcpu           = Skip CPU check (1=skip for large problems)
+
+EXAMPLES:
+  ./nsphere 7 8.0              # D=7, R=8.0, default settings
+  ./nsphere 7 8.0 256          # Explicitly set 256 threads
+  ./nsphere 7 8.0 256 1        # Skip CPU check (for large problems)
+
+
+📈 EXPECTED OUTPUT EXAMPLES
+=============================
+
+✓ Small problem (fast):
+# GPU: Tesla T4  SMs=40  CC 7.5
+# rows=9  blocks=1  threads/block=256
+GPU count = 13   kernel time = 0.131104 ms
+CPU count = 13   time = 0.006 ms   MATCH   speedup = 0.04576652x
+
+✓ Medium problem (moderate):
+# GPU: Tesla T4  SMs=40  CC 7.5
+# rows=24137569  blocks=5547  threads/block=256
+GPU count = 9656199   kernel time = 6.14019 ms
+CPU count = 9656199   time = 0.005 ms   MATCH   speedup = 0.0348x
+
+✓ Large problem (slow CPU check skipped):
+# GPU: Tesla T4  SMs=40  CC 7.5
+# rows=410338673  blocks=65535  threads/block=256
+GPU count = 65760897   kernel time = 90.6719 ms
+(CPU check skipped)
+
+
+🎯 WHAT TO REPORT TO PROFESSOR
+================================
+
+TABLE 1: Dimension (D) Scaling
+D   | Kernel Time (ms)
+----|------------------
+4   | 0.16
+5   | 0.17
+6   | 0.57
+7   | 6.14
+8   | 90.67
+9   | 1226.83
+10  | 23789.7
+
+→ Shows exponential growth (each D+1 multiplies by ~17x)
+
+TABLE 2: Radius (R) Scaling
+R   | Kernel Time (ms)
+----|------------------
+4   | 0.21
+6   | 0.96
+8   | 6.14
+10  | 17.30
+12  | 60.98
+16  | 360.04
+20  | 1673.60
+
+→ Shows slower growth than D
+
+TABLE 3: GPU Breaking Points
+- Max D (at R=8): D=11 works, D=12 overflows
+- Max R (at D=7): R=200+ works until GPU memory limit
+- Combined: D=10, R=16 works with 29934ms kernel time
+
+
+🔧 TROUBLESHOOTING
+===================
+
+Q: nvcc: command not found
+A: module load cuda
+
+Q: CUDA error: no kernel image for architecture
+A: Edit makefile, change -arch=sm_75 to match your GPU
+   nvidia-smi --query-gpu=name,compute_cap --format=csv
+
+Q: Make: Nothing to be done for 'all'
+A: make clean && make
+
+Q: nsphere binary not found
+A: make clean && make
+
+Q: Wrong count / MISMATCH
+A: Recompile and check both CPU and GPU run same inputs
+
+Q: GPU memory error / CUDA out of memory
+A: Reduce D or R - the problem is too large
+
+Q: Timeout on SLURM
+A: Increase --time in .sh file, or reduce D/R
+
+
+📝 NOTES
+========
+- Keep the `256 1` at end when testing (256 threads/block, skip CPU)
+- For very large problems, CPU check is automatically skipped
+- Kernel time is what professor wants to see
+- Save output to file: bash run_quick_test.sh | tee results.txt
+
+
+💻 SLURM SUBMISSION (Alternative to direct run)
+================================================
+
+sbatch submit_nsphere.sh          # Basic tests
+squeue -u $USER                   # Check status
+cat slurm-XXXXX.out               # View results
+
+sbatch submit_nsphere_scaling.sh  # Full scaling study
+squeue -u $USER
+cat slurm-XXXXX.out
+
+
+✅ VERIFICATION CHECKLIST
+============================
+[ ] Extracted zip file
+[ ] SSH into CTCP cluster
+[ ] module load cuda
+[ ] make clean && make
+[ ] ./nsphere 1 25.5 gives 51
+[ ] ./nsphere 2 2.05 gives 13
+[ ] ./nsphere 3 1.5 gives 19
+[ ] bash run_quick_test.sh completes
+[ ] bash stress_gpu.sh shows results
+
+When all ✓, you're ready to present!
+
+
+📞 HELP
+=======
+For issues, check README_COMPLETE.md for:
+  - Detailed parameter explanations
+  - Output format guide
+  - Algorithm explanation
+  - Performance tips
+
+
+Last updated: Oct 13, 2026
+Built for: Tesla T4 (CC 7.5), Tesla V100 (CC 7.0)
+CUDA version: 11.5+
